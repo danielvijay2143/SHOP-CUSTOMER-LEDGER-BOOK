@@ -68,8 +68,13 @@
                 </div>
             </div>
 
-            <!-- Backup & Restore Action Buttons -->
-            <div class="flex items-center space-x-2">
+            <!-- Backup & Bulk Action Buttons -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Special WhatsApp Bulk Reminder Button -->
+                <button onclick="sendBulkWhatsAppReminders()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm shadow-emerald-600/30">
+                    <i class="fa-brands fa-whatsapp text-base"></i>
+                    <span>Notify All Pending</span>
+                </button>
                 <button onclick="exportDataBackup()" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Download data file to device">
                     <i class="fa-solid fa-download text-brand-600"></i>
                     <span>Export Backup</span>
@@ -390,7 +395,7 @@
             });
         }
 
-        // EXPORT BACKUP FILE (Option 3 Feature)
+        // EXPORT BACKUP FILE
         function exportDataBackup() {
             if (customers.length === 0) {
                 showToast('No customer data to export', 'fa-circle-exclamation text-amber-400');
@@ -414,7 +419,7 @@
             document.getElementById('backup-file-input').click();
         }
 
-        // HANDLE IMPORT BACKUP FILE (Option 3 Feature)
+        // HANDLE IMPORT BACKUP FILE
         function handleBackupImport(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -610,7 +615,6 @@
 
             tbody.innerHTML = chronologicalTx.slice().reverse().map(tx => {
                 const isDebit = tx.type === 'debit';
-                // Safe date formatting across desktop and mobile devices
                 const formattedDate = new Date(tx.date.replace(/-/g, '/')).toLocaleDateString('en-IN', {
                     day: '2-digit',
                     month: '2-digit',
@@ -722,15 +726,43 @@
             showToast('Entry deleted');
         }
 
-        // WhatsApp Reminder
+        // WhatsApp Single Reminder
         function sendWhatsAppReminder() {
             if (!selectedCustomerId) return;
             const cust = customers.find(c => c.id === selectedCustomerId);
             if (!cust) return;
 
             const { netBalance } = getCustomerTotals(cust);
-            let msg = `Hello ${cust.name}, your total account balance is ₹${netBalance.toLocaleString('en-IN')}. Thank you!`;
+            let msg = `Hello ${cust.name}, your total pending account balance is ₹${netBalance.toLocaleString('en-IN')}. Please arrange payment. Thank you!`;
             window.open(`https://wa.me/91${cust.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        // Send WhatsApp Message to ALL Pending Customers
+        function sendBulkWhatsAppReminders() {
+            const pendingCustomers = customers.filter(cust => {
+                const { netBalance } = getCustomerTotals(cust);
+                return netBalance > 0;
+            });
+
+            if (pendingCustomers.length === 0) {
+                showToast('No pending customers to send messages', 'fa-circle-exclamation text-amber-400');
+                return;
+            }
+
+            const confirmAction = confirm(`Found ${pendingCustomers.length} customer(s) with pending dues. Do you want to open WhatsApp message windows for all of them?`);
+            if (!confirmAction) return;
+
+            pendingCustomers.forEach((cust, idx) => {
+                const { netBalance } = getCustomerTotals(cust);
+                const msg = `Hello ${cust.name}, your total pending account balance is ₹${netBalance.toLocaleString('en-IN')}. Please arrange payment. Thank you!`;
+                
+                // Delay each window slightly to prevent browser popup block rules
+                setTimeout(() => {
+                    window.open(`https://wa.me/91${cust.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                }, idx * 600);
+            });
+
+            showToast(`Initiated messages for ${pendingCustomers.length} pending customer(s)`);
         }
 
         // Customer Modal Controls
